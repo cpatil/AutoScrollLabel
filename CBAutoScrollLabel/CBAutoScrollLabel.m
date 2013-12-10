@@ -13,7 +13,7 @@
 #import "CBAutoScrollLabel.h"
 #import <QuartzCore/QuartzCore.h>
 
-#define kLabelCount 2
+#define kLabelCount 1
 #define kDefaultFadeLength 7.f
 // pixel buffer space between scrolling label
 #define kDefaultLabelBufferSpace 20
@@ -77,21 +77,28 @@ static void each_object(NSArray *objects, void (^block)(id object))
 {
     // create the labels
     NSMutableSet *labelSet = [[NSMutableSet alloc] initWithCapacity:kLabelCount];
-	for (int index = 0 ; index < kLabelCount ; ++index)
-    {
-		UILabel *label = [[UILabel alloc] init];
-		label.backgroundColor = [UIColor clearColor];
-        label.autoresizingMask = self.autoresizingMask;
-        
-        // store labels
-		[self.scrollView addSubview:label];
-        [labelSet addObject:label];
-        
-        #if ! __has_feature(objc_arc)
-        [label release];
-        #endif
-	}
-	
+//	for (int index = 0 ; index < kLabelCount ; ++index)
+//    {
+//		UILabel *label = [[UILabel alloc] init];
+//		label.backgroundColor = [UIColor clearColor];
+//        label.autoresizingMask = self.autoresizingMask;
+//        
+//        // store labels
+//		[self.scrollView addSubview:label];
+//        [labelSet addObject:label];
+//        
+//        #if ! __has_feature(objc_arc)
+//        [label release];
+//        #endif
+//	}
+    
+    UITextView *tview = [[UITextView alloc] init];
+    tview.backgroundColor = [UIColor clearColor];
+    tview.autoresizingMask = self.autoresizingMask;
+    tview.textAlignment = NSTextAlignmentCenter;
+    [self.scrollView addSubview:tview];
+     [labelSet addObject:tview];
+    
     self.labels = [labelSet.allObjects copy];
     
     #if ! __has_feature(objc_arc)
@@ -105,7 +112,7 @@ static void each_object(NSArray *objects, void (^block)(id object))
     _scrollingPaused = TRUE;
 	self.pauseInterval = kDefaultPauseTime;
 	self.labelSpacing = kDefaultLabelBufferSpace;
-    self.textAlignment = NSTextAlignmentLeft;
+    self.textAlignment = NSTextAlignmentCenter;
     self.animationOptions = UIViewAnimationOptionCurveEaseIn;
 	self.scrollView.showsVerticalScrollIndicator = NO;
 	self.scrollView.showsHorizontalScrollIndicator = NO;
@@ -164,7 +171,7 @@ static void each_object(NSArray *objects, void (^block)(id object))
     }
 }
 
-- (UILabel *)mainLabel
+- (UITextView *)mainLabel
 {
     return self.labels[0];
 }
@@ -314,8 +321,8 @@ static void each_object(NSArray *objects, void (^block)(id object))
     if (!self.text.length)
         return;
     
-    CGFloat labelWidth = CGRectGetWidth(self.mainLabel.bounds);
-	if (labelWidth <= CGRectGetWidth(self.bounds))
+    CGFloat labelWidth =   [self measureHeightOfUITextView:self.mainLabel]; // CGRectGetHeight(self.mainLabel.bounds);
+	if (labelWidth <= CGRectGetHeight(self.bounds))
         return;
     
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(scrollLabelIfNeeded) object:nil];
@@ -338,7 +345,7 @@ static void each_object(NSArray *objects, void (^block)(id object))
     _scrollAnimation = [CABasicAnimation animationWithKeyPath:@"bounds"];
     _scrollAnimation.duration = duration;
     _scrollAnimation.fromValue = [NSValue valueWithCGRect:origBounds];
-    bounds.origin.x += labelWidth + self.labelSpacing;
+    bounds.origin.y += labelWidth + self.labelSpacing;
     _scrollAnimation.toValue = [NSValue valueWithCGRect:bounds];
     _scrollAnimation.autoreverses = NO;
     
@@ -381,8 +388,87 @@ static void each_object(NSArray *objects, void (^block)(id object))
     self.hidden = YES;
 }
 
+- (CGFloat)measureHeightOfUITextView:(UITextView *)textView
+{
+    if ([textView respondsToSelector:@selector(snapshotViewAfterScreenUpdates:)])
+    {
+        // This is the code for iOS 7. contentSize no longer returns the correct value, so
+        // we have to calculate it.
+        //
+        // This is partly borrowed from HPGrowingTextView, but I've replaced the
+        // magic fudge factors with the calculated values (having worked out where
+        // they came from)
+        
+        CGRect frame = textView.bounds;
+        
+        // Take account of the padding added around the text.
+        
+        UIEdgeInsets textContainerInsets = textView.textContainerInset;
+        UIEdgeInsets contentInsets = textView.contentInset;
+        
+        CGFloat leftRightPadding = textContainerInsets.left + textContainerInsets.right + textView.textContainer.lineFragmentPadding * 2 + contentInsets.left + contentInsets.right;
+        CGFloat topBottomPadding = textContainerInsets.top + textContainerInsets.bottom + contentInsets.top + contentInsets.bottom;
+        
+        frame.size.width -= leftRightPadding;
+        frame.size.height -= topBottomPadding;
+        
+        NSString *textToMeasure = textView.text;
+        if ([textToMeasure hasSuffix:@"\n"])
+        {
+            textToMeasure = [NSString stringWithFormat:@"%@-", textView.text];
+        }
+        
+        // NSString class method: boundingRectWithSize:options:attributes:context is
+        // available only on ios7.0 sdk.
+        
+        NSMutableParagraphStyle *paragraphStyle = [[NSMutableParagraphStyle alloc] init];
+        [paragraphStyle setLineBreakMode:NSLineBreakByWordWrapping];
+        
+        NSDictionary *attributes = @{ NSFontAttributeName: textView.font, NSParagraphStyleAttributeName : paragraphStyle };
+        
+        CGRect size = [textToMeasure boundingRectWithSize:CGSizeMake(CGRectGetWidth(frame), MAXFLOAT)
+                                                  options:NSStringDrawingUsesLineFragmentOrigin
+                                               attributes:attributes
+                                                  context:nil];
+        
+        CGFloat measuredHeight = ceilf(CGRectGetHeight(size) + topBottomPadding);
+        return measuredHeight;
+    }
+    else
+    {
+        return textView.contentSize.height;
+    }
+}
+
+
+-(void) refreshTextView
+{
+    if (!self.mainLabel.text.length)
+        return;
+    
+    [self.mainLabel sizeToFit];
+    [self.mainLabel layoutIfNeeded];
+    
+    origBounds = self.scrollView.bounds;
+    CGSize tviewSize = CGSizeMake(origBounds.size.width, [self measureHeightOfUITextView:self.mainLabel]);
+
+    self.scrollView.contentSize = tviewSize;
+    self.mainLabel.frame = CGRectMake(origBounds.origin.x,origBounds.origin.y, tviewSize.width, tviewSize.height);
+    
+    EACH_LABEL(hidden, NO)
+    
+    [self applyGradientMaskForFadeLength:self.fadeLength enableFade:self.scrolling];
+    
+    [self scrollLabelIfNeeded];
+    
+}
+
 - (void)refreshLabels
 {
+    
+    [self refreshTextView];
+    return;
+    
 	__block float offset = 0;
 	
     // calculate the label size
