@@ -19,9 +19,14 @@ typedef enum  {
 	CBAutoScrollDirectionLeft,
 } CBAutoScrollDirection;
 
+
 @interface CBAutoScrollLabel : UIView <UIScrollViewDelegate>
+{
+    CGRect origBounds;
+}
 @property (nonatomic) CBAutoScrollDirection scrollDirection;
 @property (nonatomic) float scrollSpeed; // pixels per second
+@property (nonatomic) float scrollDuration; // num seconds to animate
 @property (nonatomic) NSTimeInterval pauseInterval;
 @property (nonatomic) NSInteger labelSpacing; // pixels
 /**
@@ -34,6 +39,8 @@ typedef enum  {
  */
 @property (nonatomic, readonly) BOOL scrolling;
 @property (nonatomic, assign) CGFloat fadeLength;
+@property (nonatomic) BOOL scrollingPaused;
+
 
 // UILabel properties
 @property (nonatomic, copy) NSString *text;
@@ -43,6 +50,11 @@ typedef enum  {
 @property (nonatomic, strong) UIColor *shadowColor;
 @property (nonatomic) CGSize shadowOffset;
 @property (nonatomic) NSTextAlignment textAlignment; // only applies when not auto-scrolling
+
+@property(nonatomic, readonly) CABasicAnimation  *scrollAnimation;
+
+-(void)startAnimating;
+-(void)stopAnimating;
 
 /**
  * Lays out the scrollview contents, enabling text scrolling if the text will be clipped.
@@ -62,6 +74,9 @@ typedef enum  {
  * Initiates auto-scroll if the label width exceeds the bounds of the scrollview.
  */
 - (void)scrollLabelIfNeeded;
+
+//-(void)pauseAndResetScrolling;
+//-(void)beginScrolling;
 
 /**
  * Observes UIApplication state notifications to auto-restart scrolling and watch for 

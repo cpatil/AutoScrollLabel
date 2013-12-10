@@ -18,7 +18,7 @@
 // pixel buffer space between scrolling label
 #define kDefaultLabelBufferSpace 20
 #define kDefaultPixelsPerSecond 30
-#define kDefaultPauseTime 1.5f
+#define kDefaultPauseTime 0.0f
 
 // shortcut method for NSArray iterations
 static void each_object(NSArray *objects, void (^block)(id object))
@@ -44,6 +44,7 @@ static void each_object(NSArray *objects, void (^block)(id object))
 @synthesize pauseInterval = _pauseInterval;
 @synthesize labelSpacing;
 @synthesize scrollSpeed = _scrollSpeed;
+@synthesize scrollDuration = _scrollDuration;
 @synthesize text;
 @synthesize labels;
 @synthesize mainLabel;
@@ -52,6 +53,7 @@ static void each_object(NSArray *objects, void (^block)(id object))
 @synthesize shadowOffset;
 @synthesize textAlignment;
 @synthesize scrolling = _scrolling;
+@synthesize scrollingPaused = _scrollingPaused;
 
 - (id)initWithCoder:(NSCoder *)aDecoder
 {
@@ -99,6 +101,8 @@ static void each_object(NSArray *objects, void (^block)(id object))
     // default values
 	_scrollDirection = CBAutoScrollDirectionLeft;
 	_scrollSpeed = kDefaultPixelsPerSecond;
+//    _scrollDuration = 30.0;
+    _scrollingPaused = TRUE;
 	self.pauseInterval = kDefaultPauseTime;
 	self.labelSpacing = kDefaultLabelBufferSpace;
     self.textAlignment = NSTextAlignmentLeft;
@@ -110,6 +114,7 @@ static void each_object(NSArray *objects, void (^block)(id object))
     self.backgroundColor = [UIColor clearColor];
     self.clipsToBounds = YES;
     self.fadeLength = kDefaultFadeLength;
+    [self setAnimationOptions:UIViewAnimationOptionCurveLinear];
 }
 
 - (void)dealloc 
@@ -240,6 +245,13 @@ static void each_object(NSArray *objects, void (^block)(id object))
     [self scrollLabelIfNeeded];
 }
 
+- (void)setScrollDuration:(float)scrollDuration
+{
+	_scrollDuration  = scrollDuration;
+    
+    [self scrollLabelIfNeeded];
+}
+
 - (void)setScrollDirection:(CBAutoScrollDirection)direction
 {
 	_scrollDirection = direction;
@@ -311,27 +323,62 @@ static void each_object(NSArray *objects, void (^block)(id object))
     
     BOOL doScrollLeft = (self.scrollDirection == CBAutoScrollDirectionLeft);
     self.scrollView.contentOffset = (doScrollLeft ? CGPointZero : CGPointMake(labelWidth + self.labelSpacing, 0));
+
+    origBounds = CGRectMake(self.scrollView.bounds.origin.x, self.scrollView.bounds.origin.y, self.scrollView.bounds.size.width, self.scrollView.bounds.size.height);
     
     // Add the left shadow after delay
-    [self performSelector:@selector(enableShadow) withObject:nil afterDelay:self.pauseInterval];
+    //    [self performSelector:@selector(enableShadow) withObject:nil afterDelay:self.pauseInterval];
     
     // animate the scrolling
-    NSTimeInterval duration = labelWidth / self.scrollSpeed;
-    [UIView animateWithDuration:duration delay:self.pauseInterval options:self.animationOptions | UIViewAnimationOptionAllowUserInteraction animations:^{
-        // adjust offset
-        self.scrollView.contentOffset = (doScrollLeft ? CGPointMake(labelWidth + self.labelSpacing, 0) : CGPointZero);
-    } completion:^(BOOL finished) {
-        _scrolling = NO;
-        
-        // remove the left shadow
-        [self applyGradientMaskForFadeLength:self.fadeLength enableFade:NO];
-        
-        // setup pause delay/loop
-        if (finished)
-        {
-            [self performSelector:@selector(scrollLabelIfNeeded) withObject:nil];
-        }
-    }];
+    NSTimeInterval duration = self.scrollDuration;
+    if (! duration)
+        duration  = labelWidth / self.scrollSpeed;
+
+    CGRect bounds = self.scrollView.bounds;
+    _scrollAnimation = [CABasicAnimation animationWithKeyPath:@"bounds"];
+    _scrollAnimation.duration = duration;
+    _scrollAnimation.fromValue = [NSValue valueWithCGRect:origBounds];
+    bounds.origin.x += labelWidth + self.labelSpacing;
+    _scrollAnimation.toValue = [NSValue valueWithCGRect:bounds];
+    _scrollAnimation.autoreverses = NO;
+    
+//    pulseAnimation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionLinear];
+//    pulseAnimation.autoreverses = YES;
+//    pulseAnimation.repeatCount = FLT_MAX;
+//    
+//    [layer addAnimation:pulseAnimation forKey:animationKeyId];
+//    
+//    [UIView animateWithDuration:duration delay:self.pauseInterval options:self.animationOptions | UIViewAnimationOptionAllowUserInteraction animations:^{
+//        // adjust offset
+//        self.scrollView.contentOffset = (doScrollLeft ? CGPointMake(labelWidth + self.labelSpacing, 0) : CGPointZero);
+//    } completion:^(BOOL finished) {
+//        _scrolling = NO;
+//        
+//        // remove the left shadow
+//        [self applyGradientMaskForFadeLength:self.fadeLength enableFade:NO];
+//        
+//        // setup pause delay/loop
+//        if (finished)
+//        {
+//            // DONT REPEAT THE ANIMATION
+////            [self performSelector:@selector(scrollLabelIfNeeded) withObject:nil];
+//        }
+//    }];
+}
+
+-(void)startAnimating
+{
+    self.hidden = NO;
+    _scrolling = YES;
+    [self.scrollView.layer addAnimation:self.scrollAnimation forKey:@"bounds"];
+}
+
+-(void)stopAnimating
+{
+    _scrolling = NO;
+    [self.scrollView.layer removeAnimationForKey:@"bounds"];
+    self.scrollView.bounds = CGRectMake(origBounds.origin.x, origBounds.origin.y, origBounds.size.width, origBounds.size.height);
+    self.hidden = YES;
 }
 
 - (void)refreshLabels
