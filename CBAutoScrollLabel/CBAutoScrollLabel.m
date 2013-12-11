@@ -268,21 +268,25 @@ static void each_object(NSArray *objects, void (^block)(id object))
 
 - (void)setShadowColor:(UIColor *)color
 {
+    return;
     EACH_LABEL(shadowColor, color)
 }
 
 - (UIColor *)shadowColor
 {
+    return [UIColor clearColor];
     return self.mainLabel.shadowColor;
 }
 
 - (void)setShadowOffset:(CGSize)offset
 {
+    return;
     EACH_LABEL(shadowOffset, offset)
 }
 
 - (CGSize)shadowOffset
 {
+    return CGSizeZero;
     return self.mainLabel.shadowOffset;
 }
 
