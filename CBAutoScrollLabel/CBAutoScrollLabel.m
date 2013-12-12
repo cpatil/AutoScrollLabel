@@ -400,6 +400,8 @@ static void each_object(NSArray *objects, void (^block)(id object))
     self.alpha = 0.0f;
     self.hidden = NO;
     self.scrollView.hidden = NO;
+    [self.scrollView.layer removeAnimationForKey:@"bounds"];
+    self.scrollView.bounds = CGRectMake(origBounds.origin.x, origBounds.origin.y, origBounds.size.width, origBounds.size.height);
     _scrolling = YES;
     [UIView animateWithDuration:5.0 animations:^{
         self.alpha = 1.0;
