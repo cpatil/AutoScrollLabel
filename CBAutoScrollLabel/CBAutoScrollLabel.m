@@ -20,6 +20,8 @@
 #define kDefaultPixelsPerSecond 30
 #define kDefaultPauseTime 0.0f
 
+#define kMaxFieldHeight 9999
+
 // shortcut method for NSArray iterations
 static void each_object(NSArray *objects, void (^block)(id object))
 {
@@ -33,7 +35,7 @@ static void each_object(NSArray *objects, void (^block)(id object))
 @interface CBAutoScrollLabel ()
 
 @property (nonatomic, strong) NSArray *labels;
-@property (strong, nonatomic, readonly) UILabel *mainLabel;
+@property (strong, nonatomic, readonly) UITextView *mainLabel;
 @property (nonatomic, strong) UIScrollView *scrollView;
 
 @end
@@ -230,12 +232,28 @@ static void each_object(NSArray *objects, void (^block)(id object))
 	return self.mainLabel.textColor;
 }
 
+
 - (void)setFont:(UIFont *)font
 {
     if (self.mainLabel.font == font)
         return;
     
     EACH_LABEL(font, font)
+    
+//    CGFloat measuredWidth = [self measuredWidthForString:@"Looked down where He lay" forBoundingRect:CGSizeMake(CGRectGetWidth(self.bounds),MAXFLOAT) forFont:self.mainLabel.font];
+//    CGFloat smallestWidth = [self measuredWidthForString:@"Looked down where He lay" forBoundingRect:CGSizeMake(CGRectGetWidth(self.bounds),MAXFLOAT) forFont:[self.mainLabel.font fontWithSize:self.mainLabel.font.pointSize - 10]];
+//    CGFloat measuredHeight = [self measuredHeightForString:@"Looked down where He lay" forBoundingRect:CGSizeMake(CGRectGetWidth(self.bounds),MAXFLOAT) forFont:self.mainLabel.font];
+//    CGFloat smallestHeight = [self measuredHeightForString:@"L" forBoundingRect:CGSizeMake(CGRectGetWidth(self.bounds),MAXFLOAT) forFont:self.mainLabel.font];
+//    
+//    UIFont *newFont = self.mainLabel.font;
+//    while (measuredHeight > smallestHeight)
+//    {
+//        newFont = [newFont fontWithSize:newFont.pointSize - 1];
+//        measuredHeight = [self measuredHeightForString:@"Looked down where He lay" forBoundingRect:CGSizeMake(CGRectGetWidth(self.bounds),MAXFLOAT) forFont:newFont];
+//        smallestHeight = [self measuredHeightForString:@"L" forBoundingRect:CGSizeMake(CGRectGetWidth(self.bounds),MAXFLOAT) forFont:newFont];
+//
+//    }
+//    self.mainLabel.font = newFont;
     
 	[self refreshLabels];
 }
@@ -275,7 +293,7 @@ static void each_object(NSArray *objects, void (^block)(id object))
 - (UIColor *)shadowColor
 {
     return [UIColor clearColor];
-    return self.mainLabel.shadowColor;
+//    return self.mainLabel.shadowColor;
 }
 
 - (void)setShadowOffset:(CGSize)offset
@@ -287,7 +305,7 @@ static void each_object(NSArray *objects, void (^block)(id object))
 - (CGSize)shadowOffset
 {
     return CGSizeZero;
-    return self.mainLabel.shadowOffset;
+//    return self.mainLabel.shadowOffset;
 }
 
 #pragma mark - Misc
@@ -379,17 +397,36 @@ static void each_object(NSArray *objects, void (^block)(id object))
 
 -(void)startAnimating
 {
+    self.alpha = 0.0f;
     self.hidden = NO;
+    self.scrollView.hidden = NO;
     _scrolling = YES;
-    [self.scrollView.layer addAnimation:self.scrollAnimation forKey:@"bounds"];
+    [UIView animateWithDuration:5.0 animations:^{
+        self.alpha = 1.0;
+    }];
+
+#warning fetch this from rhymeDB
+
+    NSRange range;
+    double delayInSeconds = [((NSNumber *)[self.mainLabel.attributedText attribute:@"initialDelay" atIndex:0 effectiveRange:&range]) doubleValue];
+    if (!delayInSeconds)
+        delayInSeconds = 0;
+    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
+    dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+        [self.scrollView.layer addAnimation:self.scrollAnimation forKey:@"bounds"];
+    });
 }
 
 -(void)stopAnimating
 {
     _scrolling = NO;
-    [self.scrollView.layer removeAnimationForKey:@"bounds"];
-    self.scrollView.bounds = CGRectMake(origBounds.origin.x, origBounds.origin.y, origBounds.size.width, origBounds.size.height);
-    self.hidden = YES;
+    [UIView animateWithDuration:1.0 animations:^{
+        self.alpha = 0.0f;
+    } completion:^(BOOL f){
+        self.hidden = YES;
+        [self.scrollView.layer removeAnimationForKey:@"bounds"];
+        self.scrollView.bounds = CGRectMake(origBounds.origin.x, origBounds.origin.y, origBounds.size.width, origBounds.size.height);
+    }];
 }
 
 - (CGFloat)measureHeightOfUITextView:(UITextView *)textView
@@ -403,7 +440,7 @@ static void each_object(NSArray *objects, void (^block)(id object))
         // magic fudge factors with the calculated values (having worked out where
         // they came from)
         
-        CGRect frame = textView.bounds;
+        CGRect frame = self.bounds;
         
         // Take account of the padding added around the text.
         
@@ -428,7 +465,7 @@ static void each_object(NSArray *objects, void (^block)(id object))
         NSMutableParagraphStyle *paragraphStyle = [[NSMutableParagraphStyle alloc] init];
         [paragraphStyle setLineBreakMode:NSLineBreakByWordWrapping];
         
-        NSDictionary *attributes = @{ NSFontAttributeName: textView.font, NSParagraphStyleAttributeName : paragraphStyle };
+        NSDictionary *attributes = @{ NSFontAttributeName: self.mainLabel.font, NSParagraphStyleAttributeName : paragraphStyle };
         
         CGRect size = [textToMeasure boundingRectWithSize:CGSizeMake(CGRectGetWidth(frame), MAXFLOAT)
                                                   options:NSStringDrawingUsesLineFragmentOrigin
@@ -444,11 +481,48 @@ static void each_object(NSArray *objects, void (^block)(id object))
     }
 }
 
+- (CGFloat)measuredWidthForString:(NSString *)str forBoundingRect:(CGSize)maxSize forFont:(UIFont *)font
+{
+    NSMutableParagraphStyle *paragraphStyle = [[NSMutableParagraphStyle alloc] init];
+    [paragraphStyle setLineBreakMode:NSLineBreakByWordWrapping];
+    
+    NSDictionary *attributes = @{ NSFontAttributeName: font, NSParagraphStyleAttributeName : paragraphStyle };
+    
+    CGRect size = [str boundingRectWithSize:maxSize
+                                              options:NSStringDrawingUsesLineFragmentOrigin
+                                           attributes:attributes
+                                              context:nil];
+    
+    CGFloat measuredWidth = ceilf(CGRectGetWidth(size));
+    return measuredWidth;
+}
+
+- (CGFloat)measuredHeightForString:(NSString *)str forBoundingRect:(CGSize)maxSize forFont:(UIFont *)font
+{
+    NSMutableParagraphStyle *paragraphStyle = [[NSMutableParagraphStyle alloc] init];
+    [paragraphStyle setLineBreakMode:NSLineBreakByWordWrapping];
+    
+    NSDictionary *attributes = @{ NSFontAttributeName: font, NSParagraphStyleAttributeName : paragraphStyle };
+    
+    CGRect size = [str boundingRectWithSize:maxSize
+                                    options:NSStringDrawingUsesLineFragmentOrigin
+                                 attributes:attributes
+                                    context:nil];
+    
+    CGFloat measuredHeight = ceilf(CGRectGetHeight(size));
+    return measuredHeight;
+}
 
 -(void) refreshTextView
 {
     if (!self.mainLabel.text.length)
         return;
+//    
+//    NSDictionary *attributes = @{NSFontAttributeName: self.mainLabel.font};
+//    CGRect rect = [self.mainLabel.text boundingRectWithSize:CGSizeMake(CGRectGetWidth(self.bounds), MAXFLOAT)
+//                                              options:NSStringDrawingUsesLineFragmentOrigin
+//                                           attributes:attributes
+//                                              context:nil];
     
     [self.mainLabel sizeToFit];
     [self.mainLabel layoutIfNeeded];
