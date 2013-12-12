@@ -27,6 +27,7 @@ typedef enum  {
 @property (nonatomic) CBAutoScrollDirection scrollDirection;
 @property (nonatomic) float scrollSpeed; // pixels per second
 @property (nonatomic) float scrollDuration; // num seconds to animate
+@property (nonatomic) double initialDelay; // num seconds to animate
 @property (nonatomic) NSTimeInterval pauseInterval;
 @property (nonatomic) NSInteger labelSpacing; // pixels
 /**

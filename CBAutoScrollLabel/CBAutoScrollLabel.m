@@ -408,10 +408,10 @@ static void each_object(NSArray *objects, void (^block)(id object))
 #warning fetch this from rhymeDB
 
     NSRange range;
-    double delayInSeconds = [((NSNumber *)[self.mainLabel.attributedText attribute:@"initialDelay" atIndex:0 effectiveRange:&range]) doubleValue];
-    if (!delayInSeconds)
-        delayInSeconds = 0;
-    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
+//    double delayInSeconds = [((NSNumber *)[self.mainLabel.attributedText attribute:@"initialDelay" atIndex:0 effectiveRange:&range]) doubleValue];
+//    if (!delayInSeconds)
+//        delayInSeconds = 0;
+    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(self.initialDelay * NSEC_PER_SEC));
     dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
         [self.scrollView.layer addAnimation:self.scrollAnimation forKey:@"bounds"];
     });
