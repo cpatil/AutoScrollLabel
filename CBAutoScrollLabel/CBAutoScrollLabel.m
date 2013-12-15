@@ -79,20 +79,6 @@ static void each_object(NSArray *objects, void (^block)(id object))
 {
     // create the labels
     NSMutableSet *labelSet = [[NSMutableSet alloc] initWithCapacity:kLabelCount];
-//	for (int index = 0 ; index < kLabelCount ; ++index)
-//    {
-//		UILabel *label = [[UILabel alloc] init];
-//		label.backgroundColor = [UIColor clearColor];
-//        label.autoresizingMask = self.autoresizingMask;
-//        
-//        // store labels
-//		[self.scrollView addSubview:label];
-//        [labelSet addObject:label];
-//        
-//        #if ! __has_feature(objc_arc)
-//        [label release];
-//        #endif
-//	}
     
     UITextView *tview = [[UITextView alloc] init];
     tview.backgroundColor = [UIColor clearColor];
@@ -122,7 +108,8 @@ static void each_object(NSArray *objects, void (^block)(id object))
     self.userInteractionEnabled = NO;
     self.backgroundColor = [UIColor clearColor];
     self.clipsToBounds = YES;
-    self.fadeLength = kDefaultFadeLength;
+//    self.fadeLength = kDefaultFadeLength;
+    self.fadeLength = 0.0;
     [self setAnimationOptions:UIViewAnimationOptionCurveLinear];
 }
 
@@ -140,7 +127,8 @@ static void each_object(NSArray *objects, void (^block)(id object))
 - (void)setFrame:(CGRect)frame
 {
     [super setFrame:frame];
-    [self applyGradientMaskForFadeLength:self.fadeLength enableFade:self.scrolling];
+//    [self applyGradientMaskForFadeLength:self.fadeLength enableFade:self.scrolling];
+    [self applyGradientMaskForFadeLength:self.fadeLength enableFade:NO];
 }
 
 #pragma mark - Properties
@@ -164,13 +152,13 @@ static void each_object(NSArray *objects, void (^block)(id object))
 
 - (void)setFadeLength:(CGFloat)fadeLength
 {
-    if (_fadeLength != fadeLength)
-    {
-        _fadeLength = fadeLength;
-        
-        [self refreshLabels];
-        [self applyGradientMaskForFadeLength:fadeLength enableFade:NO];
-    }
+//    if (_fadeLength != fadeLength)
+//    {
+//        _fadeLength = fadeLength;
+//        
+//        [self refreshLabels];
+//        [self applyGradientMaskForFadeLength:fadeLength enableFade:NO];
+//    }
 }
 
 - (UITextView *)mainLabel
@@ -335,7 +323,8 @@ static void each_object(NSArray *objects, void (^block)(id object))
 - (void)enableShadow
 {
     _scrolling = YES;
-    [self applyGradientMaskForFadeLength:self.fadeLength enableFade:YES];
+//    [self applyGradientMaskForFadeLength:self.fadeLength enableFade:YES];
+    [self applyGradientMaskForFadeLength:self.fadeLength enableFade:NO];
 }
 
 - (void)scrollLabelIfNeeded
@@ -343,33 +332,25 @@ static void each_object(NSArray *objects, void (^block)(id object))
     if (!self.text.length)
         return;
     
-    CGFloat labelWidth =   [self measureHeightOfUITextView:self.mainLabel]; // CGRectGetHeight(self.mainLabel.bounds);
-	if (labelWidth <= CGRectGetHeight(self.bounds))
+    if (self.scrollTextAnimation)
+        return;
+    
+    CGFloat labelHeight =   [self measureHeightOfUITextView:self.mainLabel]; // CGRectGetHeight(self.mainLabel.bounds);
+	if (labelHeight <= CGRectGetHeight(self.bounds))
         return;
     
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(scrollLabelIfNeeded) object:nil];
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(enableShadow) object:nil];
     
-    BOOL doScrollLeft = (self.scrollDirection == CBAutoScrollDirectionLeft);
-    self.scrollView.contentOffset = (doScrollLeft ? CGPointZero : CGPointMake(labelWidth + self.labelSpacing, 0));
+//    BOOL doScrollLeft = (self.scrollDirection == CBAutoScrollDirectionLeft);
+//    self.scrollView.contentOffset = (doScrollLeft ? CGPointZero : CGPointMake(labelWidth + self.labelSpacing, 0));
+    self.scrollView.contentOffset = CGPointMake(labelHeight + self.labelSpacing, 0);
+
 
     origBounds = CGRectMake(self.scrollView.bounds.origin.x, self.scrollView.bounds.origin.y, self.scrollView.bounds.size.width, self.scrollView.bounds.size.height);
     
     // Add the left shadow after delay
     //    [self performSelector:@selector(enableShadow) withObject:nil afterDelay:self.pauseInterval];
-    
-    // animate the scrolling
-    NSTimeInterval duration = self.scrollDuration;
-    if (! duration)
-        duration  = labelWidth / self.scrollSpeed;
-
-    CGRect bounds = self.scrollView.bounds;
-    _scrollAnimation = [CABasicAnimation animationWithKeyPath:@"bounds"];
-    _scrollAnimation.duration = duration;
-    _scrollAnimation.fromValue = [NSValue valueWithCGRect:origBounds];
-    bounds.origin.y += labelWidth + self.labelSpacing;
-    _scrollAnimation.toValue = [NSValue valueWithCGRect:bounds];
-    _scrollAnimation.autoreverses = NO;
     
 //    pulseAnimation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionLinear];
 //    pulseAnimation.autoreverses = YES;
@@ -397,44 +378,67 @@ static void each_object(NSArray *objects, void (^block)(id object))
 
 -(void)startAnimating
 {
+    NSLog(@"Starting to animate - slf:%@\ntextview:%@  scrollview: %@ scrollDuration: %f", self, self.mainLabel, self.scrollView, self.scrollDuration);
+
     self.alpha = 0.0f;
     self.hidden = NO;
-    self.scrollView.hidden = NO;
     [self.scrollView.layer removeAnimationForKey:@"bounds"];
-    self.scrollView.bounds = CGRectMake(origBounds.origin.x, origBounds.origin.y, origBounds.size.width, origBounds.size.height);
+    self.scrollView.bounds = self.bounds;
+    self.scrollView.hidden = NO;
     _scrolling = YES;
     [UIView animateWithDuration:5.0 animations:^{
         self.alpha = 1.0;
     }];
+    
+//    NSMutableAttributedString *txt = [[NSMutableAttributedString alloc] initWithString:self.mainLabel.text];
+    
+    
+    
+    
+    if (!self.scrollTextAnimation) {
+        float tviewHeight = CGRectGetHeight(self.mainLabel.bounds);
 
-#warning fetch this from rhymeDB
+        // animate the scrolling
+        NSTimeInterval duration = self.scrollDuration;
+        if (! duration)
+            duration  = tviewHeight / self.scrollSpeed;
 
-    NSRange range;
-//    double delayInSeconds = [((NSNumber *)[self.mainLabel.attributedText attribute:@"initialDelay" atIndex:0 effectiveRange:&range]) doubleValue];
-//    if (!delayInSeconds)
-//        delayInSeconds = 0;
+        CGRect bounds = self.scrollView.bounds;
+        _scrollTextAnimation = [CABasicAnimation animationWithKeyPath:@"bounds"];
+        _scrollTextAnimation.duration = duration;
+        _scrollTextAnimation.fromValue = [NSValue valueWithCGRect:self.scrollView.bounds];
+        bounds.origin.y += tviewHeight + self.labelSpacing;
+        _scrollTextAnimation.toValue = [NSValue valueWithCGRect:bounds];
+        _scrollTextAnimation.autoreverses = NO;
+        NSLog(@"created scroll animation\nfromValue:%@\ntoValue:%@\nscrollView:%@\ntextView%@\nduration:%f\nlableHeight: %f", self.scrollTextAnimation.fromValue, self.scrollTextAnimation.toValue, self.scrollView, self.mainLabel, duration, tviewHeight);
+    }
+    
     dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(self.initialDelay * NSEC_PER_SEC));
+    NSLog(@"startAnimating %llu\nscrollview:%@\ntextview:%@ ", popTime, self.scrollView, self.mainLabel);
+    
     dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
-        [self.scrollView.layer addAnimation:self.scrollAnimation forKey:@"bounds"];
+        [self.scrollView.layer addAnimation:self.scrollTextAnimation forKey:@"bounds"];
     });
 }
 
 -(void)stopAnimating
 {
+    NSLog(@"Just before stopping animate - self:%@\ntextview:%@\nscrollview:%@\nscrollDuration: %f", self.mainLabel, self.scrollView, self.scrollDuration);
+
     _scrolling = NO;
     [UIView animateWithDuration:1.0 animations:^{
         self.alpha = 0.0f;
     } completion:^(BOOL f){
-        self.hidden = YES;
+//        self.hidden = YES;
         [self.scrollView.layer removeAnimationForKey:@"bounds"];
-        self.scrollView.bounds = CGRectMake(origBounds.origin.x, origBounds.origin.y, origBounds.size.width, origBounds.size.height);
+        self.scrollTextAnimation = nil;
     }];
 }
 
 - (CGFloat)measureHeightOfUITextView:(UITextView *)textView
 {
-    if ([textView respondsToSelector:@selector(snapshotViewAfterScreenUpdates:)])
-    {
+//    if ([textView respondsToSelector:@selector(snapshotViewAfterScreenUpdates:)])
+//    {
         // This is the code for iOS 7. contentSize no longer returns the correct value, so
         // we have to calculate it.
         //
@@ -476,11 +480,11 @@ static void each_object(NSArray *objects, void (^block)(id object))
         
         CGFloat measuredHeight = ceilf(CGRectGetHeight(size) + topBottomPadding);
         return measuredHeight;
-    }
-    else
-    {
-        return textView.contentSize.height;
-    }
+//    }
+//    else
+//    {
+//        return textView.contentSize.height;
+//    }
 }
 
 - (CGFloat)measuredWidthForString:(NSString *)str forBoundingRect:(CGSize)maxSize forFont:(UIFont *)font
@@ -529,17 +533,22 @@ static void each_object(NSArray *objects, void (^block)(id object))
     [self.mainLabel sizeToFit];
     [self.mainLabel layoutIfNeeded];
     
-    origBounds = self.scrollView.bounds;
-    CGSize tviewSize = CGSizeMake(origBounds.size.width, [self measureHeightOfUITextView:self.mainLabel]);
+    CGFloat measuredHeight = [self measureHeightOfUITextView:self.mainLabel];
+    CGFloat otherHeight = [self measuredHeightForString:self.mainLabel.text forBoundingRect:CGSizeMake(CGRectGetWidth(self.bounds),MAXFLOAT) forFont:self.mainLabel.font];
+   
+    CGSize tviewSize = CGSizeMake(origBounds.size.width, measuredHeight);
 
     self.scrollView.contentSize = tviewSize;
-    self.mainLabel.frame = CGRectMake(origBounds.origin.x,origBounds.origin.y, tviewSize.width, tviewSize.height);
+    self.mainLabel.frame = CGRectMake(self.scrollView.bounds.origin.x,self.scrollView.bounds.origin.y, tviewSize.width, tviewSize.height);
     
     EACH_LABEL(hidden, NO)
     
-    [self applyGradientMaskForFadeLength:self.fadeLength enableFade:self.scrolling];
+    [self applyGradientMaskForFadeLength:self.fadeLength enableFade:NO];
     
     [self scrollLabelIfNeeded];
+
+    NSLog(@"Measured Height of textview %f  String height is %f", measuredHeight, otherHeight );
+
     
 }
 

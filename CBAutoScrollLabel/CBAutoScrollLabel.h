@@ -41,6 +41,8 @@ typedef enum  {
 @property (nonatomic, readonly) BOOL scrolling;
 @property (nonatomic, assign) CGFloat fadeLength;
 @property (nonatomic) BOOL scrollingPaused;
+@property (nonatomic, strong) UITextView *textview;
+
 
 
 // UILabel properties
@@ -52,7 +54,7 @@ typedef enum  {
 @property (nonatomic) CGSize shadowOffset;
 @property (nonatomic) NSTextAlignment textAlignment; // only applies when not auto-scrolling
 
-@property(nonatomic, readonly) CABasicAnimation  *scrollAnimation;
+@property(nonatomic, strong) CABasicAnimation  *scrollTextAnimation;
 
 -(void)startAnimating;
 -(void)stopAnimating;
